@@ -1,0 +1,81 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'network-direct'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=network-direct",
+                    "--package=network-direct"
+                ],
+                "filter": {
+                    "name": "network-direct",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'network-direct'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=network-direct",
+                    "--package=network-direct"
+                ],
+                "filter": {
+                    "name": "network-direct",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'a' Server",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=a",
+                    "--package=network-direct"
+                ],
+                "filter": {
+                    "name": "a",
+                    "kind": "example"
+                }
+            },
+            "args": ["-s", "192.168.1.1"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug example 'a' Client",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--example=a",
+                    "--package=network-direct"
+                ],
+                "filter": {
+                    "name": "a",
+                    "kind": "example"
+                }
+            },
+            "args": ["-c", "192.168.1.1"],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}
