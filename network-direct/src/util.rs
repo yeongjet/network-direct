@@ -1,32 +1,35 @@
 use std::{
     mem,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
+    net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
     ptr,
 };
 
 use network_direct_sys::ND_BUFFER_OVERFLOW;
 use windows::{
-    core::{Result, HRESULT}, Win32::{
+    Win32::{
         Foundation::{E_NOTIMPL, STATUS_BUFFER_TOO_SMALL},
         Networking::WinSock::{
-            WSACleanup, WSAGetLastError, WSAIoctl, WSASocketW, WSAStartup, AF_INET, AF_INET6, INVALID_SOCKET, SIO_ROUTING_INTERFACE_QUERY, SOCKADDR, SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET, SOCKADDR_STORAGE, SOCK_STREAM, WSADATA, WSA_FLAG_OVERLAPPED
+            AF_INET, AF_INET6, INVALID_SOCKET, SIO_ROUTING_INTERFACE_QUERY, SOCK_STREAM, SOCKADDR,
+            SOCKADDR_IN, SOCKADDR_IN6, SOCKADDR_INET, SOCKADDR_STORAGE, WSA_FLAG_OVERLAPPED,
+            WSACleanup, WSADATA, WSAGetLastError, WSAIoctl, WSASocketW, WSAStartup,
         },
-    }
+    },
+    core::{HRESULT, Result},
 };
 
 pub(crate) type GetAddressFn<T> = unsafe extern "C" fn(*mut T, *mut SOCKADDR, *mut u32) -> HRESULT;
 
 pub(crate) unsafe fn win_addr_to_std_fn<T>(this: *mut T, f: GetAddressFn<T>) -> Result<SocketAddr> {
     let mut size = 0;
-    let res = f(this, ptr::null_mut(), &mut size);
+    let res = unsafe { f(this, ptr::null_mut(), &mut size) };
     if res != ND_BUFFER_OVERFLOW && res.0 != STATUS_BUFFER_TOO_SMALL.0 {
         res.ok()?;
     }
 
     let mut data = vec![0u8; size as usize];
-    f(this, data.as_mut_ptr() as *mut _, &mut size).ok()?;
+    unsafe { f(this, data.as_mut_ptr() as *mut _, &mut size).ok() }?;
 
-    let addr: &SOCKADDR = &*(data.as_ptr() as *const _);
+    let addr: &SOCKADDR = unsafe { &*(data.as_ptr() as *const _) };
     win_addr_to_std(addr).ok_or_else(|| E_NOTIMPL.into())
 }
 

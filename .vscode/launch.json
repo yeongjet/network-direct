@@ -56,7 +56,13 @@
                     "kind": "example"
                 }
             },
-            "args": ["-s", "192.168.1.1"],
+            "env": {
+                "RUST_BACKTRACE": "1"
+            },
+            "args": [
+                "-s",
+                "192.168.1.1"
+            ],
             "cwd": "${workspaceFolder}"
         },
         {
@@ -74,7 +80,10 @@
                     "kind": "example"
                 }
             },
-            "args": ["-c", "192.168.1.1"],
+            "args": [
+                "-c",
+                "192.168.1.1"
+            ],
             "cwd": "${workspaceFolder}"
         }
     ]

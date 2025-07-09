@@ -50,7 +50,7 @@ impl CompletionQueue {
         }
     }
 
-    pub fn notify_affinity(&self) -> Result<(u16, KAFFINITY)> {
+    pub fn get_notify_affinity(&self) -> Result<(u16, KAFFINITY)> {
         unsafe {
             let mut group = 0;
             let mut affinity = 0;
@@ -66,20 +66,19 @@ impl CompletionQueue {
     pub fn notify(
         &self,
         type_: NotifyType,
-        mut overlapped: impl BorrowMut<OVERLAPPED>,
+        overlapped: *mut OVERLAPPED,
     ) -> Result<()> {
         unsafe {
-            let res = self.vtbl.Notify.unwrap()(self.ptr, type_.to_u32(), overlapped.borrow_mut());
-
+            let res = self.vtbl.Notify.unwrap()(self.ptr, type_.to_u32(), overlapped);
             if res == ND_PENDING {
-                self.get_overlapped_result(overlapped.borrow_mut(), false)
+                self.get_overlapped_result(overlapped, false)
             } else {
                 res.ok()
             }
         }
     }
 
-    pub fn results(&self, results: &mut [ND2_RESULT]) -> u32 {
+    pub fn get_results(&self, results: &mut [ND2_RESULT]) -> u32 {
         unsafe {
             self.vtbl.GetResults.unwrap()(self.ptr, results.as_mut_ptr(), results.len() as u32)
         }
@@ -88,11 +87,11 @@ impl CompletionQueue {
     pub fn poll(
         &self,
         type_: NotifyType,
-        mut overlapped: impl BorrowMut<OVERLAPPED>,
+        overlapped: *mut OVERLAPPED,
     ) -> Result<ND2_RESULT> {
         let mut temp = [ND2_RESULT::default(); 1];
-        while self.results(&mut temp) == 0 {
-            self.notify(type_, overlapped.borrow_mut())?;
+        while self.get_results(&mut temp) == 0 {
+            self.notify(type_, overlapped)?;
         }
 
         let [res] = temp;
@@ -105,8 +104,6 @@ impl ND2Overlapped for CompletionQueue {
         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
     }
 }
-
-unsafe impl Send for CompletionQueue {}
 
 impl Clone for CompletionQueue {
     fn clone(&self) -> Self {

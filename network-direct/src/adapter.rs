@@ -1,5 +1,5 @@
 use network_direct_sys::{
-    IID_IND2CompletionQueue, IID_IND2Connector, IID_IND2Listener, IID_IND2MemoryRegion, IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue, IND2Connector, IND2ConnectorVtbl, IND2Listener, IND2MemoryRegion, IND2QueuePair, KAFFINITY, ND2_ADAPTER_INFO, ND_VERSION_2
+    IID_IND2CompletionQueue, IID_IND2Connector, IID_IND2Listener, IID_IND2MemoryRegion, IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue, IND2Connector, IND2Listener, IND2MemoryRegion, IND2QueuePair, KAFFINITY, ND2_ADAPTER_INFO, ND_VERSION_2
 };
 use std::{
     fs::File,
@@ -34,7 +34,7 @@ impl Adapter {
         Ok(info)
     }
 
-    pub fn create_overlapped_file(&self) -> Result<File> {
+    pub fn create_adapter_file(&self) -> Result<File> {
         let mut file = HANDLE::default();
         unsafe {
             self.vtbl.CreateOverlappedFile.unwrap()(self.ptr, &mut file).ok()?;
@@ -42,7 +42,7 @@ impl Adapter {
         }
     }
 
-    pub fn create_memory_region(&self, file: &mut File) -> Result<UnregisteredMemoryRegion> {
+    pub fn create_memory_region(&self, file: &File) -> Result<UnregisteredMemoryRegion> {
         let mut memory_region = ptr::null_mut();
         unsafe {
             self.vtbl.CreateMemoryRegion.unwrap()(
@@ -60,12 +60,12 @@ impl Adapter {
 
     pub fn create_completion_queue(
         &self,
-        overlapped_file: &impl AsRawHandle,
+        adapter_file: &impl AsRawHandle,
         queue_depth: u32,
         group: u16,
         affinity: KAFFINITY,
     ) -> Result<CompletionQueue> {
-        let fd = HANDLE(overlapped_file.as_raw_handle() as _);
+        let fd = HANDLE(adapter_file.as_raw_handle() as _);
         let mut cq = ptr::null_mut();
         unsafe {
             self.vtbl.CreateCompletionQueue.unwrap()(
@@ -82,8 +82,8 @@ impl Adapter {
         Ok(CompletionQueue::from(cq as *mut IND2CompletionQueue))
     }
 
-    pub fn create_listener(&self, overlapped_file: &impl AsRawHandle) -> Result<Listener> {
-        let fd = HANDLE(overlapped_file.as_raw_handle() as _);
+    pub fn create_listener(&self, adapter_file: &impl AsRawHandle) -> Result<Listener> {
+        let fd = HANDLE(adapter_file.as_raw_handle() as _);
         let mut listener = ptr::null_mut();
         unsafe {
             self.vtbl.CreateListener.unwrap()(self.ptr, &IID_IND2Listener, fd, &mut listener).ok()
@@ -91,9 +91,9 @@ impl Adapter {
         Ok(Listener::from(listener as *mut IND2Listener))
     }
 
-    pub fn create_connector(&self, overlapped_file: &impl AsRawHandle) -> Result<Connector> {
+    pub fn create_connector(&self, adapter_file: &impl AsRawHandle) -> Result<Connector> {
         unsafe {
-            let fd = HANDLE(overlapped_file.as_raw_handle() as _);
+            let fd = HANDLE(adapter_file.as_raw_handle() as _);
             let mut conn = ptr::null_mut();
             self.vtbl.CreateConnector.unwrap()(self.ptr, &IID_IND2Connector, fd, &mut conn).ok()?;
             Ok(Connector::from(conn as *mut IND2Connector))

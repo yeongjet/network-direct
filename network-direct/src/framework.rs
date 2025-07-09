@@ -161,12 +161,12 @@ impl Framework {
         return Self { providers };
     }
 
-    pub fn open_adapter(&self, ip: IpAddr) -> Option<Adapter> {
+    pub fn open_adapter(&self, addr: SocketAddr) -> Option<Adapter> {
         for provider in &self.providers {
-            let address_list = provider.query_address_list().unwrap();
-            println!("address_list: {:?}", address_list);
-            if address_list.contains(&ip) {
-                let adapter_id = provider.resolve_address(SocketAddr::new(ip, 0)).unwrap();
+            let ip_list = provider.query_ip_list().unwrap();
+            println!("ip list: {:?}", ip_list);
+            if ip_list.contains(&addr.ip()) {
+                let adapter_id = provider.resolve_address(addr).unwrap();
                 let adapter = provider.open_adapter(adapter_id).unwrap();
                 return Some(adapter);
             }

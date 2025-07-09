@@ -1,5 +1,6 @@
 use std::{
     collections::HashMap,
+    mem,
     net::{IpAddr, SocketAddr},
     os::windows::io::{AsHandle, AsRawHandle},
 };
@@ -7,10 +8,18 @@ use std::{
 use clap::Parser;
 
 use network_direct::{
-    get_local_addr, Adapter, Framework, NotifyType, Overlapped, Provider, ReadLimits, RegisterFlags, RequestContext
+    Adapter, CompletionQueue, Connector, Framework, MemoryRegion, NotifyType, Overlapped, Provider,
+    ReadLimits, RegisterFlags, RequestContext, get_local_addr,
 };
 use network_direct_sys::ND2_SGE;
-use windows::Win32::{Foundation::HANDLE, Networking::WinSock::IPPROTO_TCP, System::IO::CreateIoCompletionPort};
+use windows::Win32::{
+    Foundation::HANDLE,
+    Networking::WinSock::IPPROTO_TCP,
+    System::{
+        IO::{CreateIoCompletionPort, GetQueuedCompletionStatus},
+        Threading::INFINITE,
+    },
+};
 
 /// Network Direct Test Program
 #[derive(Parser, Debug)]
@@ -61,119 +70,187 @@ impl Args {
 struct People {
     age: u32,
 }
+#[derive(Debug)]
+enum Event {
+    ConSuccess,
+    ConFailed,
+    AcceptSuccess,
+    AcceptFailed,
+    ASuccess,
+    AFailed,
+    BSuccess,
+    BFailed,
+    CSuccess,
+    CFailed,
+    DSuccess,
+    DFailed,
+}
+// struct Ov {
+//     overlapped: Overlapped,
+//     success_callback: Box<dyn Fn() + Send + Sync>,
+//     failure_callback: Box<dyn Fn() + Send + Sync>,
+// }
 
-fn run_client(framework: &Framework, remote_ip: &IpAddr) {
-    let remote_addr = SocketAddr::new(*remote_ip, 0);
-    let local_addr = get_local_addr(remote_addr);
-    println!("local_addr:{}", local_addr);
-    let adapter = framework.open_adapter(local_addr.ip()).unwrap();
+// fn run_client(framework: &Framework, remote_ip: &IpAddr) {
+//     let remote_addr = SocketAddr::new(*remote_ip, 0);
+//     let local_addr = get_local_addr(remote_addr);
+//     println!("local_addr:{}", local_addr);
+//     let adapter = framework.open_adapter(local_addr).unwrap();
+//     let adapter_file = adapter.create_adapter_file().unwrap();
+//     let unregistered_memory_region = adapter.create_memory_region(&mut adapter_file).unwrap();
+//     let x_XferLen = 4096;
+//     let mut buffer: [People; 1024] = [People { age: 0 }; 1024];
+//     let mut overlapped = Overlapped::default();
+//     let mut send_overlapped = Overlapped::default();
+//     let mut recv_overlapped = Overlapped::default();
+//     let memory_region = unregistered_memory_region
+//         .register(buffer, RegisterFlags::ALLOW_LOCAL_WRITE, &mut overlapped)
+//         .unwrap();
+//     let adapter_info = adapter.query().unwrap();
+//     let queue_depth = std::cmp::min(
+//         adapter_info.MaxCompletionQueueDepth,
+//         adapter_info.MaxReceiveQueueDepth,
+//     );
+//     let send_cq = adapter
+//         .create_completion_queue(&adapter_file, queue_depth, 0, 0)
+//         .unwrap();
+//     let recv_cq = adapter
+//         .create_completion_queue(&adapter_file, queue_depth, 0, 0)
+//         .unwrap();
+//     let m_hIocp = unsafe {
+//         CreateIoCompletionPort(HANDLE(adapter_file.as_raw_handle()), None, 0, 0).unwrap()
+//     };
+//     send_cq
+//         .notify(NotifyType::Any, &mut send_overlapped)
+//         .unwrap();
+//     recv_cq
+//         .notify(NotifyType::Any, &mut recv_overlapped)
+//         .unwrap();
+//     let connector = adapter.create_connector(&adapter_file).unwrap();
+//     let queue_pair = adapter
+//         .create_queue_pair(&recv_cq, &send_cq, 1, 1, 1, 1, 0)
+//         .unwrap();
+//     let local_token = memory_region.get_local_token();
+//     let sge = [ND2_SGE {
+//         Buffer: buffer.as_mut_ptr() as *mut std::ffi::c_void,
+//         BufferLength: 0,
+//         MemoryRegionToken: memory_region.get_local_token().0,
+//     }];
+//     queue_pair.receive(RequestContext(0), &sge).unwrap();
+//     connector.bind(local_addr).unwrap();
+//     let read_limits = ReadLimits {
+//         inbound_read_limit: IPPROTO_TCP.0 as u32,
+//         outbound_read_limit: 0,
+//     };
+//     connector
+//         .connect(&queue_pair, remote_addr, read_limits, None, &mut overlapped)
+//         .unwrap();
+//     // if m_hIocp.is_null()
+//     // {
+//     //     eprintln!("Failed to bind adapter to IOCP, error {}", GetLastError());
+//     //     std::process::exit(1);
+//     // }
+// }
 
-    let mut overlapped_file = adapter.create_overlapped_file().unwrap();
-    let unregistered_memory_region = adapter.create_memory_region(&mut overlapped_file).unwrap();
-    let x_XferLen = 4096;
-    let mut buffer: [People; 1024] = [People { age: 0 }; 1024];
-    let mut overlapped = Overlapped::new().unwrap();
-    let mut send_overlapped = Overlapped::new().unwrap();
-    let mut recv_overlapped = Overlapped::new().unwrap();
-    let memory_region = unregistered_memory_region
-        .register(buffer, RegisterFlags::ALLOW_LOCAL_WRITE, &mut overlapped)
-        .unwrap();
-    let adapter_info = adapter.query().unwrap();
-    let queue_depth = std::cmp::min(
-        adapter_info.MaxCompletionQueueDepth,
-        adapter_info.MaxReceiveQueueDepth,
-    );
-    let send_cq = adapter
-        .create_completion_queue(&overlapped_file, queue_depth, 0, 0)
-        .unwrap();
-    let recv_cq = adapter
-        .create_completion_queue(&overlapped_file, queue_depth, 0, 0)
-        .unwrap();
-    let m_hIocp = unsafe {
-        CreateIoCompletionPort(HANDLE(overlapped_file.as_raw_handle()), None, 0, 0).unwrap()
-    };
-    send_cq
-        .notify(NotifyType::Any, &mut send_overlapped)
-        .unwrap();
-    recv_cq
-        .notify(NotifyType::Any, &mut recv_overlapped)
-        .unwrap();
-    let connector = adapter.create_connector(&overlapped_file).unwrap();
+fn connect_success_callback<T>(
+    adapter: &Adapter,
+    connector: &Connector,
+    recv_cq: &CompletionQueue,
+    send_cq: &CompletionQueue,
+    memory_region: &MemoryRegion<T>,
+) {
+    println!("connect success callback");
     let queue_pair = adapter
         .create_queue_pair(&recv_cq, &send_cq, 1, 1, 1, 1, 0)
         .unwrap();
-    let local_token = memory_region.get_local_token();
+    let mut buffer: [People; 1024] = [People { age: 0 }; 1024];
     let sge = [ND2_SGE {
         Buffer: buffer.as_mut_ptr() as *mut std::ffi::c_void,
-        BufferLength: 0,
+        BufferLength: mem::size_of_val(&buffer) as u32,
         MemoryRegionToken: memory_region.get_local_token().0,
     }];
     queue_pair.receive(RequestContext(0), &sge).unwrap();
-    connector.bind(local_addr).unwrap();
-    let read_limits  = ReadLimits {
-        inbound_read_limit: IPPROTO_TCP.0 as u32,
-        outbound_read_limit: 0
+    let read_limits = ReadLimits {
+        inbound_read_limit: 0,
+        outbound_read_limit: 0,
     };
-    connector.connect(&queue_pair, remote_addr, read_limits, None, &mut overlapped).unwrap();
-    // if m_hIocp.is_null()
-    // {
-    //     eprintln!("Failed to bind adapter to IOCP, error {}", GetLastError());
-    //     std::process::exit(1);
-    // }
+    let mut accept_ov = Overlapped::new(Event::AcceptSuccess, Event::AcceptFailed);
+    let result = connector.accept(&queue_pair, read_limits.clone(), None, &mut accept_ov);
+    println!("result {:?}", result);
 }
 
 fn run_server(framework: &Framework, local_ip: &IpAddr) {
-    // let fSuccess = unsafe { GetQueuedCompletionStatus(pTest->m_hIocp, &bytesRet, &key, &pOv, INFINITE).unwrap() };
-    let addr = SocketAddr::new(*local_ip, 0);
-    let adapter = framework.open_adapter(*local_ip).unwrap();
-
-    let adapter_info = adapter.query().unwrap();
-    println!("adapter_info:{:?}", adapter_info);
-
-    let mut overlapped_file = adapter.create_overlapped_file().unwrap();
-    println!("overlapped_file:{:?}", overlapped_file);
-    let unregistered_memory_region = adapter.create_memory_region(&mut overlapped_file).unwrap();
-
+    let local_addr = SocketAddr::new(*local_ip, 54321);
+    let adapter = framework.open_adapter(local_addr).unwrap();
+    let mut adapter_file = adapter.create_adapter_file().unwrap();
+    let unregistered_memory_region = adapter.create_memory_region(&mut adapter_file).unwrap();
     let mut buffer: [People; 1024] = [People { age: 0 }; 1024];
-    let flags: u32 = 0;
-    let mut overlapped = Overlapped::new().unwrap();
-    let mut send_overlapped = Overlapped::new().unwrap();
-    let mut recv_overlapped = Overlapped::new().unwrap();
-
-    let ss = unregistered_memory_region
-        .register(
-            &mut buffer,
-            RegisterFlags::ALLOW_REMOTE_WRITE,
-            &mut overlapped,
-        )
+    let mut ov = Overlapped::new(Event::ASuccess, Event::BFailed);
+    let memory_region = unregistered_memory_region
+        .register(&mut buffer, RegisterFlags::ALLOW_REMOTE_WRITE, &mut ov)
         .unwrap();
+    let adapter_info = adapter.query().unwrap();
     let queue_depth = std::cmp::min(
         adapter_info.MaxCompletionQueueDepth,
         adapter_info.MaxReceiveQueueDepth,
     );
     let send_cq = adapter
-        .create_completion_queue(&overlapped_file, queue_depth, 0, 0)
+        .create_completion_queue(&adapter_file, queue_depth, 0, 0)
         .unwrap();
     let recv_cq = adapter
-        .create_completion_queue(&overlapped_file, queue_depth, 0, 0)
+        .create_completion_queue(&adapter_file, queue_depth, 0, 0)
         .unwrap();
-
-    let listener = adapter.create_listener(&overlapped_file).unwrap();
-    listener.bind(addr).unwrap();
+    let mut send_ov = Overlapped::new(Event::BSuccess, Event::BFailed);
+    let mut recv_ov = Overlapped::new(Event::CSuccess, Event::CFailed);
+    send_cq.notify(NotifyType::Any, &mut send_ov).unwrap();
+    recv_cq.notify(NotifyType::Any, &mut recv_ov).unwrap();
+    let listener = adapter.create_listener(&adapter_file).unwrap();
+    listener.bind(local_addr).unwrap();
     listener.listen(0).unwrap();
-    // let m_hIocp = unsafe { CreateIoCompletionPort(&overlapped_file, nullptr, 0, 0) };
-    send_cq
-        .notify(NotifyType::Any, &mut send_overlapped)
-        .unwrap();
-    recv_cq
-        .notify(NotifyType::Any, &mut recv_overlapped)
-        .unwrap();
+    let iocp = unsafe {
+        CreateIoCompletionPort(HANDLE(adapter_file.as_raw_handle()), None, 0, 0).unwrap()
+    };
+    let mut connector = adapter.create_connector(&adapter_file).unwrap();
+    let mut connect_ov = Overlapped::new(Event::ConSuccess, Event::ConFailed);
 
-    let recv_cq = adapter
-        .create_completion_queue(&overlapped_file, queue_depth, 0, 0)
+    listener
+        .get_connection_request(&mut connector, &mut connect_ov)
         .unwrap();
-
-    println!("{}", queue_depth);
+    loop {
+        let mut bytes_ret = 0u32;
+        let mut key = 0usize;
+        let mut rov_ptr = std::ptr::null_mut();
+        println!("GetQueuedCompletionStatus");
+        let result = unsafe {
+            GetQueuedCompletionStatus(iocp, &mut bytes_ret, &mut key, &mut rov_ptr, INFINITE)
+        };
+        println!("GetQueuedCompletionStatus end result:{:?}", result);
+        if rov_ptr.is_null() {
+            println!("ov is null");
+        }
+        let overlapped = unsafe { &mut *(rov_ptr as *mut Overlapped<Event>) };
+        match result {
+            Ok(_) => {
+                println!("success");
+                if let Some(event_type) = &overlapped.success_event_type {
+                    println!("event_type:{:?}", event_type);
+                    connect_success_callback(
+                        &adapter,
+                        &connector,
+                        &recv_cq,
+                        &send_cq,
+                        &memory_region,
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("failed: {:?}", e);
+                if let Some(event_type) = &overlapped.failure_event_type {
+                    println!("event_type:{:?}", event_type)
+                }
+            }
+        }
+    }
 }
 // cargo run --example a -- -s 192.168.1.1
 // cargo run --example a -- --server 192.168.1.1
@@ -188,7 +265,7 @@ fn main() {
         run_server(&framework, &args.ip);
     } else {
         println!("Running in client mode, remote ip: {}", args.ip);
-        run_client(&framework, &args.ip)
+        //run_client(&framework, &args.ip)
     }
 
     // Example pointer, replace with actual pointer as needed

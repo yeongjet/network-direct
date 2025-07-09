@@ -15,6 +15,15 @@ pub struct ReadLimits {
     pub outbound_read_limit: u32,
 }
 
+impl Default for ReadLimits {
+    fn default() -> Self {
+        Self {
+            inbound_read_limit: 0,
+            outbound_read_limit: 0,
+        }
+    }
+}
+
 pub struct Connector {
     pub(crate) ptr: *mut IND2Connector,
     vtbl: IND2ConnectorVtbl,
@@ -52,7 +61,7 @@ impl Connector {
         dest_address: impl Into<SocketAddr>,
         limits: ReadLimits,
         private_data: Option<&[u8]>,
-        mut overlapped: impl BorrowMut<OVERLAPPED>,
+        overlapped: *mut OVERLAPPED,
     ) -> Result<()> {
         let (addr, addr_len) = std_addr_to_win(dest_address.into());
         unsafe {
@@ -69,7 +78,7 @@ impl Connector {
                 limits.outbound_read_limit,
                 data_ptr as *const _,
                 data_len as u32,
-                overlapped.borrow_mut(),
+                overlapped,
             );
 
             if res == ND_PENDING {
@@ -80,9 +89,9 @@ impl Connector {
         }
     }
 
-    pub fn complete_connect(&self, mut overlapped: impl BorrowMut<OVERLAPPED>) -> Result<()> {
+    pub fn complete_connect(&self, overlapped: *mut OVERLAPPED) -> Result<()> {
         unsafe {
-            let res = self.vtbl.CompleteConnect.unwrap()(self.ptr, overlapped.borrow_mut());
+            let res = self.vtbl.CompleteConnect.unwrap()(self.ptr, overlapped);
             if res == ND_PENDING {
                 self.get_overlapped_result(overlapped, true)
             } else {
@@ -92,17 +101,26 @@ impl Connector {
     }
 
     pub fn accept(
-        &mut self,
+        &self,
         queue_pair: &QueuePair,
         limits: ReadLimits,
         private_data: Option<&[u8]>,
-        mut overlapped: impl BorrowMut<OVERLAPPED>,
+        ov_ptr: *mut OVERLAPPED,
     ) -> Result<()> {
         unsafe {
             let (data_ptr, data_len) = private_data
                 .map(|s| (s.as_ptr(), s.len()))
                 .unwrap_or_else(|| (ptr::null(), 0));
-
+            println!(
+                "{:?},{:?},{},{},{:?},{},{:p}",
+                self.ptr,
+                queue_pair.ptr as *mut _,
+                limits.inbound_read_limit,
+                limits.outbound_read_limit,
+                data_ptr as *const _,
+                data_len as u32,
+                ov_ptr
+            );
             let res = self.vtbl.Accept.unwrap()(
                 self.ptr,
                 queue_pair.ptr as *mut _,
@@ -110,10 +128,10 @@ impl Connector {
                 limits.outbound_read_limit,
                 data_ptr as *const _,
                 data_len as u32,
-                overlapped.borrow_mut(),
+                ov_ptr,
             );
             if res == ND_PENDING {
-                self.get_overlapped_result(overlapped, true)
+                self.get_overlapped_result(ov_ptr, false)
             } else {
                 res.ok()
             }
@@ -173,20 +191,20 @@ impl Connector {
         unsafe { win_addr_to_std_fn(self.ptr, self.vtbl.GetPeerAddress.unwrap()) }
     }
 
-    pub fn notify_disconnect(&self, mut overlapped: impl BorrowMut<OVERLAPPED>) -> Result<()> {
+    pub fn notify_disconnect(&self, mut overlapped: *mut OVERLAPPED) -> Result<()> {
         unsafe {
-            let res = self.vtbl.NotifyDisconnect.unwrap()(self.ptr, overlapped.borrow_mut());
+            let res = self.vtbl.NotifyDisconnect.unwrap()(self.ptr, overlapped);
             if res == ND_PENDING {
-                self.get_overlapped_result(overlapped, true)
+                self.get_overlapped_result(overlapped, false)
             } else {
                 res.ok()
             }
         }
     }
 
-    pub fn disconnect(&self, mut overlapped: impl BorrowMut<OVERLAPPED>) -> Result<()> {
+    pub fn disconnect(&self, overlapped: *mut OVERLAPPED) -> Result<()> {
         unsafe {
-            let res = self.vtbl.Disconnect.unwrap()(self.ptr, overlapped.borrow_mut());
+            let res = self.vtbl.Disconnect.unwrap()(self.ptr, overlapped);
             if res == ND_PENDING {
                 self.get_overlapped_result(overlapped, true)
             } else {
@@ -201,8 +219,6 @@ impl ND2Overlapped for Connector {
         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
     }
 }
-
-unsafe impl Send for Connector {}
 
 impl Clone for Connector {
     fn clone(&self) -> Self {

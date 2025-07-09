@@ -2,7 +2,7 @@ use std::{
     net::{IpAddr, SocketAddr},
     ptr,
 };
-use network_direct_sys::{IID_IND2Adapter, IND2Adapter, IND2ConnectorVtbl, IND2Provider, IND2ProviderVtbl, ND_BUFFER_OVERFLOW};
+use network_direct_sys::{IID_IND2Adapter, IND2Adapter, IND2Provider, IND2ProviderVtbl, ND_BUFFER_OVERFLOW};
 use windows::{
     Win32::
         Networking::WinSock::SOCKET_ADDRESS_LIST
@@ -32,7 +32,7 @@ impl Provider {
         Self { ptr, vtbl: unsafe { *((*ptr).lpVtbl) } }
     }
 
-    pub fn query_address_list(&self) -> Result<Vec<IpAddr>> {
+    pub fn query_ip_list(&self) -> Result<Vec<IpAddr>> {
         let mut size = 0;
         let ptr = ptr::null_mut();
         let result = unsafe {

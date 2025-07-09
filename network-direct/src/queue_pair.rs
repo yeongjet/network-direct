@@ -1,3 +1,5 @@
+use std::ffi::c_void;
+
 use bitflags::bitflags;
 use network_direct_sys::{IND2MemoryRegion, IND2MemoryWindow, IND2QueuePair, IND2QueuePairVtbl, ND2_SGE, ND_OP_FLAG_ALLOW_READ, ND_OP_FLAG_ALLOW_WRITE, ND_OP_FLAG_INLINE, ND_OP_FLAG_READ_FENCE, ND_OP_FLAG_SEND_AND_SOLICIT_EVENT, ND_OP_FLAG_SILENT_SUCCESS};
 use windows::core::Result;
@@ -76,13 +78,14 @@ impl QueuePair {
 	}
 
 	pub fn receive(&self, request_context: RequestContext, sge: &[ND2_SGE]) -> Result<()> {
+		println!("sge:{:?}{}", sge[0].Buffer, sge.len());
 		unsafe { self.vtbl.Receive.unwrap()(self.ptr, request_context.as_ptr(), sge.as_ptr(), sge.len() as u32).ok() }
 	}
 
 	pub fn bind<T>(
-		&mut self,
+		&self,
 		request_context: RequestContext,
-		memory_region: &impl AsRef<IND2MemoryRegion>,
+		mem_region: &impl AsRef<IND2MemoryRegion>,
 		memory_window: &impl AsRef<IND2MemoryWindow>,
 		buffer: &[T],
 		flags: BindFlags,
@@ -91,7 +94,7 @@ impl QueuePair {
 			self.vtbl.Bind.unwrap()(
 				self.ptr,
 				request_context.as_ptr(),
-				memory_region.as_ref() as *const _ as *mut _,
+				mem_region.as_ref() as *const _ as *mut _,
 				memory_window.as_ref() as *const _ as *mut _,
 				buffer.as_ptr() as _,
 				buffer.len() as _,
@@ -102,7 +105,7 @@ impl QueuePair {
 	}
 
 	pub fn invalidate<T>(
-		&mut self,
+		&self,
 		request_context: RequestContext,
 		memory_window: &impl AsRef<IND2MemoryWindow>,
 		flags: InvalidateFlags,
@@ -119,7 +122,7 @@ impl QueuePair {
 	}
 
 	pub fn read(
-		&mut self,
+		&self,
 		request_context: RequestContext,
 		sge: &[ND2_SGE],
 		remote_address: u64,
@@ -141,7 +144,7 @@ impl QueuePair {
 	}
 
 	pub fn write(
-		&mut self,
+		&self,
 		request_context: RequestContext,
 		sge: &[ND2_SGE],
 		remote_address: u64,

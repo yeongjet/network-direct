@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 windows-core = "0.61.2"
-derive_more = { version = "2.0.1", features = ["debug"] }
 windows = { version = "0.61.3", features = [
     "Win32_Networking_WinSock",
     "Win32_System_Environment",
@@ -17,3 +16,4 @@ windows = { version = "0.61.3", features = [
 network-direct-sys = { path = "../network-direct-sys", version = "0.1.0" }
 bitflags = "2.9.1"
 clap = { version = "4.5.40", features = ["derive"] }
+winapi = { version = "0.3.9", features = ["ioapiset", "winsock2", "handleapi"] }

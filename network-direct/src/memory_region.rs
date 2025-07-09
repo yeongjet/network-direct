@@ -63,7 +63,7 @@ impl UnregisteredMemoryRegion {
         &self,
         buffer: T,
         flags: RegisterFlags,
-        mut overlapped: impl BorrowMut<OVERLAPPED>,
+        overlapped: *mut OVERLAPPED,
     ) -> Result<MemoryRegion<T>>
     where
         T: AsRef<[U]>,
@@ -75,17 +75,17 @@ impl UnregisteredMemoryRegion {
                 slice.as_ptr() as _,
                 slice.len() as u64,
                 flags.bits(),
-                overlapped.borrow_mut(),
+                overlapped,
             );
             if res == ND_PENDING {
-                self.get_overlapped_result(overlapped.borrow_mut(), true)?;
+                self.get_overlapped_result(overlapped, true)?;
             } else {
                 res.ok()?;
             }
         }
-        let reg_memory_region = MemoryRegion::from(self.ptr, Some(buffer));
+        let reg_mem_region = MemoryRegion::from(self.ptr, Some(buffer));
         mem::forget(self);
-        Ok(reg_memory_region)
+        Ok(reg_mem_region)
     }
 }
 
@@ -106,8 +106,11 @@ impl Drop for UnregisteredMemoryRegion {
 pub struct MemoryRegion<T> {
     ptr: *mut IND2MemoryRegion,
     vtbl: IND2MemoryRegionVtbl,
-    buffer: Option<T>,
+    pub buffer: Option<T>,
 }
+unsafe impl<T> Send for MemoryRegion<T> where T: Send {}
+
+// unsafe impl<T> Sync for MemoryRegion<T> {}
 
 impl<T> AsRef<IND2MemoryRegion> for MemoryRegion<T> {
     fn as_ref(&self) -> &IND2MemoryRegion {
@@ -148,11 +151,11 @@ impl<T> MemoryRegion<T> {
 
     pub fn deregister(
         mut self,
-        mut overlapped: impl BorrowMut<OVERLAPPED>,
+        overlapped: *mut OVERLAPPED,
     ) -> Result<(UnregisteredMemoryRegion, T)> {
-        let res = unsafe { self.vtbl.Deregister.unwrap()(self.ptr, overlapped.borrow_mut()) };
+        let res = unsafe { self.vtbl.Deregister.unwrap()(self.ptr, overlapped) };
         if res == ND_PENDING {
-            self.get_overlapped_result(overlapped.borrow_mut(), true)?;
+            self.get_overlapped_result(overlapped, true)?;
         } else {
             res.ok()?;
         }
@@ -170,9 +173,6 @@ impl<T> ND2Overlapped for MemoryRegion<T> {
         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
     }
 }
-
-unsafe impl<T: Send> Send for MemoryRegion<T> {}
-unsafe impl<T: Sync> Sync for MemoryRegion<T> {}
 
 impl<T> Drop for MemoryRegion<T> {
     fn drop(&mut self) {

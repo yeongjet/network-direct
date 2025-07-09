@@ -49,18 +49,18 @@ impl Listener {
 
     pub fn get_connection_request(
         &self,
-        connector: &mut Connector,
-        mut overlapped: impl BorrowMut<OVERLAPPED>,
+        connector: &Connector,
+        overlapped: *mut OVERLAPPED,
     ) -> Result<()> {
         unsafe {
             let res = self.vtbl.GetConnectionRequest.unwrap()(
                 self.ptr,
                 connector.ptr as *mut _,
-                overlapped.borrow_mut(),
+                overlapped,
             );
 
             if res == ND_PENDING {
-                self.get_overlapped_result(overlapped, true)
+                self.get_overlapped_result(overlapped, false)
             } else {
                 res.ok()
             }
@@ -73,8 +73,6 @@ impl ND2Overlapped for Listener {
         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
     }
 }
-
-unsafe impl Send for Listener {}
 
 impl Clone for Listener {
     fn clone(&self) -> Self {
