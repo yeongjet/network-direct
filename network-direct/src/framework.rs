@@ -1,25 +1,20 @@
-use std::{
-    collections::HashMap, ffi::{self, c_void}, mem, net::{IpAddr, SocketAddr}, ptr::{self, addr_of}
-};
-
+use std::{ffi, mem, net::SocketAddr, ptr::{self, addr_of}};
 use network_direct_sys::{IID_IND2Provider, IND2Provider, ND_VERSION_2};
-// use lazy_static::lazy_static;
-// use networkdirect_sys::*;
-// use thiserror::Error;
 use windows::{
-    core::{GUID, HRESULT, PCSTR, PCWSTR, PWSTR}, Win32::{
-        Foundation::{HANDLE, MAX_PATH},
+    Win32::{
+        Foundation::MAX_PATH,
         Networking::WinSock::{
-            WSCEnumProtocols, WSCGetProviderPath, AF_INET, AF_INET6, WSAENOBUFS, WSAPROTOCOL_INFOW
+            WSAENOBUFS, WSAPROTOCOL_INFOW, WSCEnumProtocols, WSCGetProviderPath,
         },
         System::{
             Environment::ExpandEnvironmentStringsW,
-            LibraryLoader::{GetProcAddress, LoadLibraryExW, LOAD_LIBRARY_FLAGS},
+            LibraryLoader::{GetProcAddress, LOAD_LIBRARY_FLAGS, LoadLibraryExW},
         },
-    }
+    },
+    core::{GUID, HRESULT, PCSTR, PCWSTR, PWSTR},
 };
 
-use crate::{Adapter, Provider, ND_PROVIDER_FLAGS, ND_SERVICE_FLAGS1};
+use crate::{Adapter, Provider};
 
 pub type DllGetClassObject = unsafe extern "C" fn(
     rclsid: *const GUID,
@@ -66,20 +61,19 @@ impl Framework {
             );
         }
         let nd_protocos: Vec<_> = protocos
-                .iter()
-                .copied()
-                .filter(|x| {
-                    // x.dwServiceFlags1 &  ND_SERVICE_FLAGS1 == ND_SERVICE_FLAGS1
-                    //     && 
-                        x.iVersion == ND_VERSION_2 as i32
-                        // && x.dwProviderFlags & ND_PROVIDER_FLAGS == ND_PROVIDER_FLAGS
-                        // && matches!(x.iAddressFamily, i if i == AF_INET.0.into() || i == AF_INET6.0.into())
-                        // && x.iSocketType == -1
-                        // && x.iProtocol == 0
-                        // && x.iProtocolMaxOffset == 0
-                })
-                .collect();
-        println!("nd_protocos:{:?}", nd_protocos);
+            .iter()
+            .copied()
+            .filter(|x| {
+                // x.dwServiceFlags1 &  ND_SERVICE_FLAGS1 == ND_SERVICE_FLAGS1
+                //     &&
+                x.iVersion == ND_VERSION_2 as i32
+                // && x.dwProviderFlags & ND_PROVIDER_FLAGS == ND_PROVIDER_FLAGS
+                // && matches!(x.iAddressFamily, i if i == AF_INET.0.into() || i == AF_INET6.0.into())
+                // && x.iSocketType == -1
+                // && x.iProtocol == 0
+                // && x.iProtocolMaxOffset == 0
+            })
+            .collect();
         nd_protocos.iter().for_each(|x| {
             // 路径长度不能为0
             let mut dll_path_len = MAX_PATH as i32;
@@ -130,28 +124,23 @@ impl Framework {
             let get_class_object =
                 unsafe { GetProcAddress(hmodule, PCSTR("DllGetClassObject".as_ptr())).unwrap() };
             let get_class_object: DllGetClassObject = unsafe { mem::transmute(get_class_object) };
-            println!("proc: {:?}", get_class_object);
+            //println!("proc: {:?}", get_class_object);
             let can_unload_now =
                 unsafe { GetProcAddress(hmodule, PCSTR("DllCanUnloadNow".as_ptr())).unwrap() };
             let can_unload_now: DllCanUnloadNow = unsafe { mem::transmute(can_unload_now) };
-            println!("canUnloadNow: {:?}", can_unload_now);
+            // println!("canUnloadNow: {:?}", can_unload_now);
             // let provider = providers.first().unwrap();
             let mut provider_ptr = ptr::null_mut();
-            println!(
-                "{:p},{:?},{:p}",
-                provider_ptr,
-                addr_of!(provider_ptr),
-                &provider_ptr
-            );
             unsafe {
                 (get_class_object)(&x.ProviderId, &IID_IND2Provider, &mut provider_ptr).unwrap();
             };
-            println!(
-                "{:p},{:?},{:p}",
-                provider_ptr,
-                addr_of!(provider_ptr),
-                &provider_ptr
-            );
+            // println!(
+            //     "{:p},{:?},{:?},{:p}",
+            //     provider_ptr,
+            //     provider_ptr,
+            //     addr_of!(provider_ptr),
+            //     &provider_ptr
+            // );
             // \xd0\x47\x37\x92\xff\x7f\x00\x00\x01
             // 0x6a440feec8(provider_ptr)[0x182a04548d0]
             // 0x182a04548d0[\xd0\x47\x37\x92\xff\x7f\x00\x00\x01]
@@ -164,7 +153,7 @@ impl Framework {
     pub fn open_adapter(&self, addr: SocketAddr) -> Option<Adapter> {
         for provider in &self.providers {
             let ip_list = provider.query_ip_list().unwrap();
-            println!("ip list: {:?}", ip_list);
+            println!("available ip: {:?}", ip_list);
             if ip_list.contains(&addr.ip()) {
                 let adapter_id = provider.resolve_address(addr).unwrap();
                 let adapter = provider.open_adapter(adapter_id).unwrap();

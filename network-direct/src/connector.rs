@@ -1,7 +1,7 @@
 use network_direct_sys::{
     IND2Connector, IND2ConnectorVtbl, IND2Overlapped, ND_BUFFER_OVERFLOW, ND_PENDING,
 };
-use std::{borrow::BorrowMut, net::SocketAddr, ptr};
+use std::{net::SocketAddr, ptr};
 use windows::{Win32::System::IO::OVERLAPPED, core::Result};
 
 use crate::{
@@ -112,15 +112,21 @@ impl Connector {
                 .map(|s| (s.as_ptr(), s.len()))
                 .unwrap_or_else(|| (ptr::null(), 0));
             println!(
-                "{:?},{:?},{},{},{:?},{},{:p}",
-                self.ptr,
-                queue_pair.ptr as *mut _,
-                limits.inbound_read_limit,
-                limits.outbound_read_limit,
-                data_ptr as *const _,
-                data_len as u32,
+                "nd accept: {:p},{:p},{:p}",
+                self,
+                queue_pair,
                 ov_ptr
             );
+            // println!(
+            //     "{:?},{:?},{},{},{:?},{},{:p}",
+            //     self.ptr,
+            //     queue_pair.ptr as *mut _,
+            //     limits.inbound_read_limit,
+            //     limits.outbound_read_limit,
+            //     data_ptr as *const _,
+            //     data_len as u32,
+            //     ov_ptr
+            // );
             let res = self.vtbl.Accept.unwrap()(
                 self.ptr,
                 queue_pair.ptr as *mut _,
@@ -191,7 +197,7 @@ impl Connector {
         unsafe { win_addr_to_std_fn(self.ptr, self.vtbl.GetPeerAddress.unwrap()) }
     }
 
-    pub fn notify_disconnect(&self, mut overlapped: *mut OVERLAPPED) -> Result<()> {
+    pub fn notify_disconnect(&self, overlapped: *mut OVERLAPPED) -> Result<()> {
         unsafe {
             let res = self.vtbl.NotifyDisconnect.unwrap()(self.ptr, overlapped);
             if res == ND_PENDING {
@@ -206,7 +212,7 @@ impl Connector {
         unsafe {
             let res = self.vtbl.Disconnect.unwrap()(self.ptr, overlapped);
             if res == ND_PENDING {
-                self.get_overlapped_result(overlapped, true)
+                self.get_overlapped_result(overlapped, false)
             } else {
                 res.ok()
             }

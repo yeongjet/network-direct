@@ -1,7 +1,7 @@
-use std::{borrow::BorrowMut, mem};
+use std::pin::Pin;
 
+use crate::ND2Overlapped;
 use bitflags::bitflags;
-
 use network_direct_sys::{
     IND2MemoryRegion, IND2MemoryRegionVtbl, IND2Overlapped, ND_MR_FLAG_ALLOW_LOCAL_WRITE,
     ND_MR_FLAG_ALLOW_REMOTE_READ, ND_MR_FLAG_ALLOW_REMOTE_WRITE, ND_MR_FLAG_DO_NOT_SECURE_VM,
@@ -9,8 +9,6 @@ use network_direct_sys::{
 };
 use windows::Win32::System::IO::OVERLAPPED;
 use windows::core::Result;
-
-use crate::ND2Overlapped;
 
 pub struct RemoteToken(pub u32);
 
@@ -26,106 +24,80 @@ bitflags! {
     }
 }
 
-pub struct UnregisteredMemoryRegion {
+// pub struct UnregisteredMemoryRegion {
+//     ptr: *mut IND2MemoryRegion,
+//     vtbl: IND2MemoryRegionVtbl,
+// }
+
+// impl AsRef<IND2MemoryRegion> for UnregisteredMemoryRegion {
+//     fn as_ref(&self) -> &IND2MemoryRegion {
+//         unsafe { &*self.ptr }
+//     }
+// }
+
+// impl AsMut<IND2MemoryRegion> for UnregisteredMemoryRegion {
+//     fn as_mut(&mut self) -> &mut IND2MemoryRegion {
+//         unsafe { &mut *self.ptr }
+//     }
+// }
+
+// impl UnregisteredMemoryRegion {
+//     pub fn from(ptr: *mut IND2MemoryRegion) -> Self {
+//         Self {
+//             ptr,
+//             vtbl: unsafe { *((*ptr).lpVtbl) },
+//         }
+//     }
+
+//     pub fn get_local_token(&self) -> LocalToken {
+//         LocalToken(unsafe { self.vtbl.GetLocalToken.unwrap()(self.ptr) })
+//     }
+
+//     pub fn get_remote_token(&self) -> RemoteToken {
+//         RemoteToken(unsafe { self.vtbl.GetRemoteToken.unwrap()(self.ptr) })
+//     }
+
+// }
+
+// impl ND2Overlapped for UnregisteredMemoryRegion {
+//     fn as_overlapped_mut(&self) -> &mut IND2Overlapped {
+//         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
+//     }
+// }
+
+// impl Drop for UnregisteredMemoryRegion {
+//     fn drop(&mut self) {
+//         unsafe {
+//             let _n = self.vtbl.Release.unwrap()(self.ptr);
+//         }
+//     }
+// }
+
+pub type Buffer = Pin<Box<[u8; 4096]>>;
+
+pub struct MemoryRegion {
     ptr: *mut IND2MemoryRegion,
     vtbl: IND2MemoryRegionVtbl,
+    buffer: Buffer,
 }
-
-impl AsRef<IND2MemoryRegion> for UnregisteredMemoryRegion {
-    fn as_ref(&self) -> &IND2MemoryRegion {
-        unsafe { &*self.ptr }
-    }
-}
-
-impl AsMut<IND2MemoryRegion> for UnregisteredMemoryRegion {
-    fn as_mut(&mut self) -> &mut IND2MemoryRegion {
-        unsafe { &mut *self.ptr }
-    }
-}
-
-impl UnregisteredMemoryRegion {
-    pub fn from(ptr: *mut IND2MemoryRegion) -> Self {
-        Self {
-            ptr,
-            vtbl: unsafe { *((*ptr).lpVtbl) },
-        }
-    }
-
-    pub fn get_local_token(&self) -> LocalToken {
-        LocalToken(unsafe { self.vtbl.GetLocalToken.unwrap()(self.ptr) })
-    }
-
-    pub fn get_remote_token(&self) -> RemoteToken {
-        RemoteToken(unsafe { self.vtbl.GetRemoteToken.unwrap()(self.ptr) })
-    }
-
-    pub fn register<T, U>(
-        &self,
-        buffer: T,
-        flags: RegisterFlags,
-        overlapped: *mut OVERLAPPED,
-    ) -> Result<MemoryRegion<T>>
-    where
-        T: AsRef<[U]>,
-    {
-        let slice = buffer.as_ref();
-        unsafe {
-            let res = self.vtbl.Register.unwrap()(
-                self.ptr,
-                slice.as_ptr() as _,
-                slice.len() as u64,
-                flags.bits(),
-                overlapped,
-            );
-            if res == ND_PENDING {
-                self.get_overlapped_result(overlapped, true)?;
-            } else {
-                res.ok()?;
-            }
-        }
-        let reg_mem_region = MemoryRegion::from(self.ptr, Some(buffer));
-        mem::forget(self);
-        Ok(reg_mem_region)
-    }
-}
-
-impl ND2Overlapped for UnregisteredMemoryRegion {
-    fn as_overlapped_mut(&self) -> &mut IND2Overlapped {
-        unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
-    }
-}
-
-impl Drop for UnregisteredMemoryRegion {
-    fn drop(&mut self) {
-        unsafe {
-            let _n = self.vtbl.Release.unwrap()(self.ptr);
-        }
-    }
-}
-
-pub struct MemoryRegion<T> {
-    ptr: *mut IND2MemoryRegion,
-    vtbl: IND2MemoryRegionVtbl,
-    pub buffer: Option<T>,
-}
-unsafe impl<T> Send for MemoryRegion<T> where T: Send {}
+// unsafe impl<T> Send for MemoryRegion<T> where T: Send {}
 
 // unsafe impl<T> Sync for MemoryRegion<T> {}
 
-impl<T> AsRef<IND2MemoryRegion> for MemoryRegion<T> {
-    fn as_ref(&self) -> &IND2MemoryRegion {
-        unsafe { &*self.ptr }
-    }
-}
+// impl<T> AsRef<IND2MemoryRegion> for MemoryRegion<T> {
+//     fn as_ref(&self) -> &IND2MemoryRegion {
+//         unsafe { &*self.ptr }
+//     }
+// }
 
-impl<T> AsMut<IND2MemoryRegion> for MemoryRegion<T> {
-    fn as_mut(&mut self) -> &mut IND2MemoryRegion {
-        unsafe { &mut *self.ptr }
-    }
-}
+// impl<T> AsMut<IND2MemoryRegion> for MemoryRegion<T> {
+//     fn as_mut(&mut self) -> &mut IND2MemoryRegion {
+//         unsafe { &mut *self.ptr }
+//     }
+// }
 
-impl<T> MemoryRegion<T> {
-    pub fn from(ptr: *mut IND2MemoryRegion, buffer: Option<T>) -> Self {
+impl MemoryRegion {
+    pub fn from(ptr: *mut IND2MemoryRegion, buffer: Buffer) -> Self {
         Self {
             ptr,
             vtbl: unsafe { *((*ptr).lpVtbl) },
@@ -141,40 +113,59 @@ impl<T> MemoryRegion<T> {
         RemoteToken(unsafe { self.vtbl.GetRemoteToken.unwrap()(self.ptr) })
     }
 
-    pub fn buffer(&self) -> &T {
-        self.buffer.as_ref().unwrap()
+    pub fn buffer_ref(&self) -> Pin<&[u8; 4096]> {
+        self.buffer.as_ref()
     }
 
-    pub fn buffer_mut(&mut self) -> &mut T {
-        self.buffer.as_mut().unwrap()
+    pub fn buffer_mut(&mut self) -> Pin<&mut [u8; 4096]> {
+        self.buffer.as_mut()
     }
 
-    pub fn deregister(
-        mut self,
-        overlapped: *mut OVERLAPPED,
-    ) -> Result<(UnregisteredMemoryRegion, T)> {
+    pub fn register(&self, flags: RegisterFlags, overlapped: *mut OVERLAPPED) -> Result<()> {
+        use std::ffi::c_void;
+        let buffer = self.buffer_ref();
+        unsafe {
+            let res = self.vtbl.Register.unwrap()(
+                self.ptr,
+                buffer.get_ref() as *const u8 as *const c_void,
+                buffer.len() as u64,
+                flags.bits(),
+                overlapped,
+            );
+            if res == ND_PENDING {
+                self.get_overlapped_result(overlapped, true)
+            } else {
+                res.ok()
+            }
+        }
+        // let reg_mem_region = MemoryRegion::from(self.ptr, Some(buffer));
+
+        // Ok(reg_mem_region)
+    }
+
+    pub fn deregister(self, overlapped: *mut OVERLAPPED) -> Result<()> {
         let res = unsafe { self.vtbl.Deregister.unwrap()(self.ptr, overlapped) };
         if res == ND_PENDING {
-            self.get_overlapped_result(overlapped, true)?;
+            self.get_overlapped_result(overlapped, true)
         } else {
-            res.ok()?;
+            res.ok()
         }
-        let parts = (
-            UnregisteredMemoryRegion::from(self.ptr),
-            self.buffer.take().unwrap(),
-        );
-        mem::forget(self);
-        Ok(parts)
+        // let parts = (
+        //     UnregisteredMemoryRegion::from(self.ptr),
+        //     self.buffer.take().unwrap(),
+        // );
+        // mem::forget(self);
+        // Ok(parts)
     }
 }
 
-impl<T> ND2Overlapped for MemoryRegion<T> {
+impl ND2Overlapped for MemoryRegion {
     fn as_overlapped_mut(&self) -> &mut IND2Overlapped {
         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
     }
 }
 
-impl<T> Drop for MemoryRegion<T> {
+impl Drop for MemoryRegion {
     fn drop(&mut self) {
         unsafe {
             let _n = self.vtbl.Release.unwrap()(self.ptr);

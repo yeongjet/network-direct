@@ -1,4 +1,4 @@
-use std::{borrow::BorrowMut, net::SocketAddr};
+use std::net::SocketAddr;
 
 use network_direct_sys::{IND2Listener, IND2ListenerVtbl, IND2Overlapped, ND_PENDING};
 use windows::{Win32::System::IO::OVERLAPPED, core::Result};

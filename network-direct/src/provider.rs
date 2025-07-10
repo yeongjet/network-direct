@@ -73,3 +73,21 @@ impl Provider {
         Ok(Adapter::from(adapter as *mut IND2Adapter))
 	}
 }
+
+impl Clone for Provider {
+	fn clone(&self) -> Self {
+		unsafe {
+			let _n = self.vtbl.AddRef.unwrap()(self.ptr);
+		}
+
+		Self { ptr: self.ptr, vtbl: self.vtbl }
+	}
+}
+
+impl Drop for Provider {
+	fn drop(&mut self) {
+		unsafe {
+			let _n = self.vtbl.Release.unwrap()(self.ptr);
+		}
+	}
+}

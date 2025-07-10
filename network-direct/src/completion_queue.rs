@@ -1,5 +1,3 @@
-use std::borrow::BorrowMut;
-
 use network_direct_sys::{
     IND2CompletionQueue, IND2CompletionQueueVtbl, IND2Overlapped, KAFFINITY, ND_CQ_NOTIFY_ANY,
     ND_CQ_NOTIFY_ERRORS, ND_CQ_NOTIFY_SOLICITED, ND_PENDING, ND2_RESULT,

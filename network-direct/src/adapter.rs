@@ -1,5 +1,7 @@
 use network_direct_sys::{
-    IID_IND2CompletionQueue, IID_IND2Connector, IID_IND2Listener, IID_IND2MemoryRegion, IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue, IND2Connector, IND2Listener, IND2MemoryRegion, IND2QueuePair, KAFFINITY, ND2_ADAPTER_INFO, ND_VERSION_2
+    IID_IND2CompletionQueue, IID_IND2Connector, IID_IND2Listener, IID_IND2MemoryRegion,
+    IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue, IND2Connector,
+    IND2Listener, IND2MemoryRegion, IND2QueuePair, KAFFINITY, ND_VERSION_2, ND2_ADAPTER_INFO,
 };
 use std::{
     fs::File,
@@ -9,7 +11,7 @@ use std::{
 };
 use windows::{Win32::Foundation::HANDLE, core::Result};
 
-use crate::{CompletionQueue, Connector, Listener, QueuePair, UnregisteredMemoryRegion};
+use crate::{Buffer, CompletionQueue, Connector, Listener, MemoryRegion, QueuePair};
 
 pub struct Adapter {
     ptr: *mut IND2Adapter,
@@ -42,7 +44,7 @@ impl Adapter {
         }
     }
 
-    pub fn create_memory_region(&self, file: &File) -> Result<UnregisteredMemoryRegion> {
+    pub fn create_memory_region(&self, file: &File, buffer: Buffer) -> Result<MemoryRegion> {
         let mut memory_region = ptr::null_mut();
         unsafe {
             self.vtbl.CreateMemoryRegion.unwrap()(
@@ -53,8 +55,9 @@ impl Adapter {
             )
             .ok()
         }?;
-        Ok(UnregisteredMemoryRegion::from(
+        Ok(MemoryRegion::from(
             memory_region as *mut IND2MemoryRegion,
+            buffer,
         ))
     }
 
@@ -101,33 +104,51 @@ impl Adapter {
     }
 
     pub fn create_queue_pair(
-		&self,
-		receive_completion_queue: &impl AsRef<IND2CompletionQueue>,
-		initiator_completion_queue: &impl AsRef<IND2CompletionQueue>,
-		receive_queue_depth: u32,
-		initiator_queue_depth: u32,
-		max_receive_request_sge: u32,
-		max_initiator_request_sge: u32,
-		inline_data_size: u32,
-	) -> Result<QueuePair> {
-		unsafe {
-			let mut qp = ptr::null_mut();
-			self.vtbl.CreateQueuePair.unwrap()(
-				self.ptr,
-				&IID_IND2QueuePair,
-				receive_completion_queue.as_ref() as *const _ as *mut _,
-				initiator_completion_queue.as_ref() as *const _ as *mut _,
-				ptr::null_mut(),
-				receive_queue_depth,
-				initiator_queue_depth,
-				max_receive_request_sge,
-				max_initiator_request_sge,
-				inline_data_size,
-				&mut qp,
-			)
-			.ok()?;
+        &self,
+        receive_completion_queue: &impl AsRef<IND2CompletionQueue>,
+        initiator_completion_queue: &impl AsRef<IND2CompletionQueue>,
+        receive_queue_depth: u32,
+        initiator_queue_depth: u32,
+        max_receive_request_sge: u32,
+        max_initiator_request_sge: u32,
+        inline_data_size: u32,
+    ) -> Result<QueuePair> {
+        unsafe {
+            let mut qp = ptr::null_mut();
+            self.vtbl.CreateQueuePair.unwrap()(
+                self.ptr,
+                &IID_IND2QueuePair,
+                receive_completion_queue.as_ref() as *const _ as *mut _,
+                initiator_completion_queue.as_ref() as *const _ as *mut _,
+                ptr::null_mut(),
+                receive_queue_depth,
+                initiator_queue_depth,
+                max_receive_request_sge,
+                max_initiator_request_sge,
+                inline_data_size,
+                &mut qp,
+            )
+            .ok()?;
 
-			Ok(QueuePair::from(qp as *mut IND2QueuePair))
+            Ok(QueuePair::from(qp as *mut IND2QueuePair))
+        }
+    }
+}
+
+impl Clone for Adapter {
+	fn clone(&self) -> Self {
+		unsafe {
+			let _n = self.vtbl.AddRef.unwrap()(self.ptr);
+		}
+
+		Self { ptr: self.ptr, vtbl: self.vtbl }
+	}
+}
+
+impl Drop for Adapter {
+	fn drop(&mut self) {
+		unsafe {
+			let _n = self.vtbl.Release.unwrap()(self.ptr);
 		}
 	}
 }
