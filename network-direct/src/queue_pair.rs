@@ -170,7 +170,6 @@ impl Clone for QueuePair {
 		unsafe {
 			let _n = self.vtbl.AddRef.unwrap()(self.ptr);
 		}
-
 		Self { ptr: self.ptr, vtbl: self.vtbl }
 	}
 }

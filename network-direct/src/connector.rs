@@ -111,12 +111,12 @@ impl Connector {
             let (data_ptr, data_len) = private_data
                 .map(|s| (s.as_ptr(), s.len()))
                 .unwrap_or_else(|| (ptr::null(), 0));
-            println!(
-                "nd accept: {:p},{:p},{:p}",
-                self,
-                queue_pair,
-                ov_ptr
-            );
+            // println!(
+            //     "nd accept: {:p},{:p},{:p}",
+            //     self,
+            //     queue_pair,
+            //     ov_ptr
+            // );
             // println!(
             //     "{:?},{:?},{},{},{:?},{},{:p}",
             //     self.ptr,
@@ -137,7 +137,7 @@ impl Connector {
                 ov_ptr,
             );
             if res == ND_PENDING {
-                self.get_overlapped_result(ov_ptr, false)
+                self.get_overlapped_result(ov_ptr, true)
             } else {
                 res.ok()
             }

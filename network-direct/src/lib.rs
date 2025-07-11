@@ -36,7 +36,7 @@ mod queue_pair;
 mod request_context;
 mod framework;
 mod util;
-
+mod memory_window;
 
 pub use definitions::*;
 pub use adapter::*;
