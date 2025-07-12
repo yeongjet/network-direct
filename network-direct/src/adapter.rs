@@ -1,7 +1,9 @@
+use generic_array::ArrayLength;
 use network_direct_sys::{
     IID_IND2CompletionQueue, IID_IND2Connector, IID_IND2Listener, IID_IND2MemoryRegion,
-    IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue, IND2Connector,
-    IND2Listener, IND2MemoryRegion, IND2QueuePair, KAFFINITY, ND_VERSION_2, ND2_ADAPTER_INFO,
+    IID_IND2MemoryWindow, IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue,
+    IND2Connector, IND2Listener, IND2MemoryRegion, IND2MemoryWindow, IND2QueuePair, KAFFINITY,
+    ND_VERSION_2, ND2_ADAPTER_INFO,
 };
 use std::{
     fs::File,
@@ -11,7 +13,7 @@ use std::{
 };
 use windows::{Win32::Foundation::HANDLE, core::Result};
 
-use crate::{Buffer, CompletionQueue, Connector, Listener, MemoryRegion, QueuePair};
+use crate::{Buffer, CompletionQueue, Connector, Listener, MemoryRegion, MemoryWindow, QueuePair};
 
 pub struct Adapter {
     ptr: *mut IND2Adapter,
@@ -44,7 +46,11 @@ impl Adapter {
         }
     }
 
-    pub fn create_memory_region(&self, file: &File, buffer: Buffer) -> Result<MemoryRegion> {
+    pub fn create_memory_region<T, N: ArrayLength>(
+        &self,
+        file: &File,
+        buffer: Buffer<T, N>,
+    ) -> Result<MemoryRegion<T, N>> {
         let mut memory_region = ptr::null_mut();
         unsafe {
             self.vtbl.CreateMemoryRegion.unwrap()(
@@ -59,6 +65,19 @@ impl Adapter {
             memory_region as *mut IND2MemoryRegion,
             buffer,
         ))
+    }
+
+    pub fn create_memory_window(&self) -> Result<MemoryWindow> {
+        let mut memory_window = ptr::null_mut();
+        unsafe {
+            self.vtbl.CreateMemoryWindow.unwrap()(
+                self.ptr,
+                &IID_IND2MemoryWindow,
+                &mut memory_window,
+            )
+            .ok()
+        }?;
+        Ok(unsafe { MemoryWindow::from(memory_window as *mut IND2MemoryWindow) })
     }
 
     pub fn create_completion_queue(
@@ -129,26 +148,27 @@ impl Adapter {
                 &mut qp,
             )
             .ok()?;
-
             Ok(QueuePair::from(qp as *mut IND2QueuePair))
         }
     }
 }
 
 impl Clone for Adapter {
-	fn clone(&self) -> Self {
-		unsafe {
-			let _n = self.vtbl.AddRef.unwrap()(self.ptr);
-		}
-
-		Self { ptr: self.ptr, vtbl: self.vtbl }
-	}
+    fn clone(&self) -> Self {
+        unsafe {
+            let _n = self.vtbl.AddRef.unwrap()(self.ptr);
+        }
+        Self {
+            ptr: self.ptr,
+            vtbl: self.vtbl,
+        }
+    }
 }
 
 impl Drop for Adapter {
-	fn drop(&mut self) {
-		unsafe {
-			let _n = self.vtbl.Release.unwrap()(self.ptr);
-		}
-	}
+    fn drop(&mut self) {
+        unsafe {
+            let _n = self.vtbl.Release.unwrap()(self.ptr);
+        }
+    }
 }

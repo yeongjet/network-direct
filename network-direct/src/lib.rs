@@ -50,6 +50,7 @@ pub use queue_pair::*;
 pub use request_context::*;
 pub use framework::*;
 pub use util::*;
+pub use memory_window::*;
 
 pub mod sys {
 	pub use network_direct_sys::*;

@@ -17,3 +17,4 @@ network-direct-sys = { path = "../network-direct-sys", version = "0.1.0" }
 bitflags = "2.9.1"
 clap = { version = "4.5.40", features = ["derive"] }
 winapi = { version = "0.3.9", features = ["ioapiset", "winsock2", "handleapi"] }
+generic-array = "1.2.0"
