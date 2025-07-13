@@ -1,8 +1,8 @@
+use std::marker::PhantomData;
 use std::pin::Pin;
 
 use crate::ND2Overlapped;
 use bitflags::bitflags;
-use generic_array::{ArrayLength, GenericArray};
 use network_direct_sys::{
     IND2MemoryRegion, IND2MemoryRegionVtbl, IND2Overlapped, ND_MR_FLAG_ALLOW_LOCAL_WRITE,
     ND_MR_FLAG_ALLOW_REMOTE_READ, ND_MR_FLAG_ALLOW_REMOTE_WRITE, ND_MR_FLAG_DO_NOT_SECURE_VM,
@@ -75,44 +75,67 @@ bitflags! {
 // }
 
 // pub type Buffer = Pin<Box<[u8; 4096]>>;
-pub type Buffer<T, N> = Pin<Box<GenericArray<T, N>>>;
+// pub type Buffer<T, N> = Pin<Box<GenericArray<T, N>>>;
 
-pub struct MemoryRegion<T, N: ArrayLength> {
+// pub struct MemoryRegion<T, U>
+// where
+//     T: AsRef<[U]>,
+// {
+//     ptr: *mut IND2MemoryRegion,
+//     vtbl: IND2MemoryRegionVtbl,
+//     pub buffer: T,
+// }
+
+pub struct MemoryRegion<T, P>
+where
+    T: AsRef<[P]>,
+{
     ptr: *mut IND2MemoryRegion,
     vtbl: IND2MemoryRegionVtbl,
-    pub buffer: Buffer<T, N>,
+    pub buffer: Pin<Box<T>>,
+    _marker: PhantomData<P>,
 }
 // unsafe impl<T> Send for MemoryRegion<T> where T: Send {}
 
 // unsafe impl<T> Sync for MemoryRegion<T> {}
 
-impl<T, N: ArrayLength> AsRef<IND2MemoryRegion> for MemoryRegion<T, N> {
+impl<T, P> AsRef<IND2MemoryRegion> for MemoryRegion<T, P>
+where
+    T: AsRef<[P]>,
+{
     fn as_ref(&self) -> &IND2MemoryRegion {
         unsafe { &*self.ptr }
     }
 }
 
-impl<T, N: ArrayLength> AsMut<IND2MemoryRegion> for MemoryRegion<T, N> {
+impl<T, P> AsMut<IND2MemoryRegion> for MemoryRegion<T, P>
+where
+    T: AsRef<[P]>,
+{
     fn as_mut(&mut self) -> &mut IND2MemoryRegion {
         unsafe { &mut *self.ptr }
     }
 }
 
-impl<T, N: ArrayLength> MemoryRegion<T, N> {
-    pub fn from(ptr: *mut IND2MemoryRegion, buffer: Buffer<T, N>) -> Self {
+impl<T, P> MemoryRegion<T, P>
+where
+    T: AsRef<[P]>,
+{
+    pub fn from(ptr: *mut IND2MemoryRegion, buffer: Pin<Box<T>>) -> Self {
         Self {
             ptr,
             vtbl: unsafe { *((*ptr).lpVtbl) },
             buffer,
+            _marker: PhantomData,
         }
     }
 
-    pub fn get_local_token(&self) -> LocalToken {
-        LocalToken(unsafe { self.vtbl.GetLocalToken.unwrap()(self.ptr) })
+    pub fn get_local_token(&self) -> u32 {
+        unsafe { self.vtbl.GetLocalToken.unwrap()(self.ptr) }
     }
 
-    pub fn get_remote_token(&self) -> RemoteToken {
-        RemoteToken(unsafe { self.vtbl.GetRemoteToken.unwrap()(self.ptr) })
+    pub fn get_remote_token(&self) -> u32 {
+        unsafe { self.vtbl.GetRemoteToken.unwrap()(self.ptr) }
     }
 
     // pub fn buffer_ref(&self) -> Pin<&[u8; 4096]> {
@@ -125,7 +148,7 @@ impl<T, N: ArrayLength> MemoryRegion<T, N> {
 
     pub fn register(&self, flags: RegisterFlags, overlapped: *mut OVERLAPPED) -> Result<()> {
         use std::ffi::c_void;
-        let buffer = self.buffer.as_slice();
+        let buffer = (*self.buffer).as_ref();
         unsafe {
             let res = self.vtbl.Register.unwrap()(
                 self.ptr,
@@ -161,13 +184,19 @@ impl<T, N: ArrayLength> MemoryRegion<T, N> {
     }
 }
 
-impl<T, N: ArrayLength> ND2Overlapped for MemoryRegion<T, N> {
+impl<T, P> ND2Overlapped for MemoryRegion<T, P>
+where
+    T: AsRef<[P]>,
+{
     fn as_overlapped_mut(&self) -> &mut IND2Overlapped {
         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
     }
 }
 
-impl<T, N: ArrayLength> Drop for MemoryRegion<T, N> {
+impl<T, P> Drop for MemoryRegion<T, P>
+where
+    T: AsRef<[P]>,
+{
     fn drop(&mut self) {
         unsafe {
             let _n = self.vtbl.Release.unwrap()(self.ptr);

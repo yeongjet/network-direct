@@ -1,4 +1,3 @@
-use generic_array::ArrayLength;
 use network_direct_sys::{
     IID_IND2CompletionQueue, IID_IND2Connector, IID_IND2Listener, IID_IND2MemoryRegion,
     IID_IND2MemoryWindow, IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue,
@@ -6,14 +5,11 @@ use network_direct_sys::{
     ND_VERSION_2, ND2_ADAPTER_INFO,
 };
 use std::{
-    fs::File,
-    mem,
-    os::windows::io::{AsRawHandle, FromRawHandle},
-    ptr,
+    fs::File, mem, os::windows::io::{AsRawHandle, FromRawHandle}, pin::Pin, ptr
 };
 use windows::{Win32::Foundation::HANDLE, core::Result};
 
-use crate::{Buffer, CompletionQueue, Connector, Listener, MemoryRegion, MemoryWindow, QueuePair};
+use crate::{CompletionQueue, Connector, Listener, MemoryRegion, MemoryWindow, QueuePair};
 
 pub struct Adapter {
     ptr: *mut IND2Adapter,
@@ -46,11 +42,14 @@ impl Adapter {
         }
     }
 
-    pub fn create_memory_region<T, N: ArrayLength>(
+    pub fn create_memory_region<T, P>(
         &self,
         file: &File,
-        buffer: Buffer<T, N>,
-    ) -> Result<MemoryRegion<T, N>> {
+        buffer: Pin<Box<T>>,
+    ) -> Result<MemoryRegion<T, P>>
+    where
+        T: AsRef<[P]>,
+    {
         let mut memory_region = ptr::null_mut();
         unsafe {
             self.vtbl.CreateMemoryRegion.unwrap()(

@@ -1,5 +1,6 @@
+use std::pin::Pin;
+
 use bitflags::bitflags;
-use generic_array::ArrayLength;
 use network_direct_sys::{
     IND2MemoryRegion, IND2MemoryWindow, IND2QueuePair, IND2QueuePairVtbl, ND_OP_FLAG_ALLOW_READ,
     ND_OP_FLAG_ALLOW_WRITE, ND_OP_FLAG_INLINE, ND_OP_FLAG_READ_FENCE,
@@ -7,7 +8,7 @@ use network_direct_sys::{
 };
 use windows::core::Result;
 
-use crate::{Buffer, RemoteToken, RequestContext};
+use crate::{RemoteToken, RequestContext};
 
 bitflags! {
     pub struct SendFlags: u32 {
@@ -100,12 +101,12 @@ impl QueuePair {
         }
     }
 
-    pub fn bind<T, N: ArrayLength>(
+    pub fn bind<T>(
         &self,
         request_context: RequestContext,
         mem_region: &impl AsRef<IND2MemoryRegion>,
         memory_window: &impl AsRef<IND2MemoryWindow>,
-        buffer: &Buffer<T, N>,
+        buffer: &[T],
         flags: BindFlags,
     ) -> Result<()> {
         unsafe {
