@@ -5,7 +5,10 @@ use network_direct_sys::{
     ND_VERSION_2, ND2_ADAPTER_INFO,
 };
 use std::{
-    fs::File, mem, os::windows::io::{AsRawHandle, FromRawHandle}, pin::Pin, ptr
+    fs::File,
+    mem,
+    os::windows::io::{AsRawHandle, FromRawHandle},
+    ptr,
 };
 use windows::{Win32::Foundation::HANDLE, core::Result};
 
@@ -42,13 +45,9 @@ impl Adapter {
         }
     }
 
-    pub fn create_memory_region<T, P>(
-        &self,
-        file: &File,
-        buffer: Pin<Box<T>>,
-    ) -> Result<MemoryRegion<T, P>>
+    pub fn create_memory_region<T, P>(&self, file: &File, buffer: T) -> Result<MemoryRegion<T, P>>
     where
-        T: AsRef<[P]>,
+        T: AsRef<Vec<P>>,
     {
         let mut memory_region = ptr::null_mut();
         unsafe {

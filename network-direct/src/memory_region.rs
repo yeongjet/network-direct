@@ -88,11 +88,11 @@ bitflags! {
 
 pub struct MemoryRegion<T, P>
 where
-    T: AsRef<[P]>,
+    T: AsRef<Vec<P>>,
 {
     ptr: *mut IND2MemoryRegion,
     vtbl: IND2MemoryRegionVtbl,
-    pub buffer: Pin<Box<T>>,
+    pub buffer: T,
     _marker: PhantomData<P>,
 }
 // unsafe impl<T> Send for MemoryRegion<T> where T: Send {}
@@ -101,7 +101,7 @@ where
 
 impl<T, P> AsRef<IND2MemoryRegion> for MemoryRegion<T, P>
 where
-    T: AsRef<[P]>,
+    T: AsRef<Vec<P>>,
 {
     fn as_ref(&self) -> &IND2MemoryRegion {
         unsafe { &*self.ptr }
@@ -110,7 +110,7 @@ where
 
 impl<T, P> AsMut<IND2MemoryRegion> for MemoryRegion<T, P>
 where
-    T: AsRef<[P]>,
+    T: AsRef<Vec<P>>,
 {
     fn as_mut(&mut self) -> &mut IND2MemoryRegion {
         unsafe { &mut *self.ptr }
@@ -119,9 +119,9 @@ where
 
 impl<T, P> MemoryRegion<T, P>
 where
-    T: AsRef<[P]>,
+    T: AsRef<Vec<P>>,
 {
-    pub fn from(ptr: *mut IND2MemoryRegion, buffer: Pin<Box<T>>) -> Self {
+    pub fn from(ptr: *mut IND2MemoryRegion, buffer: T) -> Self {
         Self {
             ptr,
             vtbl: unsafe { *((*ptr).lpVtbl) },
@@ -148,7 +148,7 @@ where
 
     pub fn register(&self, flags: RegisterFlags, overlapped: *mut OVERLAPPED) -> Result<()> {
         use std::ffi::c_void;
-        let buffer = (*self.buffer).as_ref();
+        let buffer = self.buffer.as_ref();
         unsafe {
             let res = self.vtbl.Register.unwrap()(
                 self.ptr,
@@ -186,7 +186,7 @@ where
 
 impl<T, P> ND2Overlapped for MemoryRegion<T, P>
 where
-    T: AsRef<[P]>,
+    T: AsRef<Vec<P>>,
 {
     fn as_overlapped_mut(&self) -> &mut IND2Overlapped {
         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
@@ -195,7 +195,7 @@ where
 
 impl<T, P> Drop for MemoryRegion<T, P>
 where
-    T: AsRef<[P]>,
+    T: AsRef<Vec<P>>,
 {
     fn drop(&mut self) {
         unsafe {

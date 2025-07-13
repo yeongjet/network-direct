@@ -106,7 +106,7 @@ impl QueuePair {
         request_context: RequestContext,
         mem_region: &impl AsRef<IND2MemoryRegion>,
         memory_window: &impl AsRef<IND2MemoryWindow>,
-        buffer: &[T],
+        buffer: &Vec<T>,
         flags: BindFlags,
     ) -> Result<()> {
         unsafe {
