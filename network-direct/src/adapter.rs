@@ -12,7 +12,7 @@ use std::{
 };
 use windows::{Win32::Foundation::HANDLE, core::Result};
 
-use crate::{CompletionQueue, Connector, Listener, MemoryRegion, MemoryWindow, QueuePair};
+use crate::{Buffer, CompletionQueue, Connector, Listener, MemoryRegion, MemoryWindow, QueuePair};
 
 pub struct Adapter {
     ptr: *mut IND2Adapter,
@@ -45,10 +45,11 @@ impl Adapter {
         }
     }
 
-    pub fn create_memory_region<T, P>(&self, file: &File, buffer: T) -> Result<MemoryRegion<T, P>>
-    where
-        T: AsRef<Vec<P>>,
-    {
+    pub fn create_memory_region<T: Buffer>(
+        &self,
+        file: &File,
+        buffer: T,
+    ) -> Result<MemoryRegion<T>> {
         let mut memory_region = ptr::null_mut();
         unsafe {
             self.vtbl.CreateMemoryRegion.unwrap()(
