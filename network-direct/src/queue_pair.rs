@@ -167,7 +167,7 @@ impl QueuePair {
         request_context: RequestContext,
         sge: &[ND2_SGE],
         remote_address: u64,
-        remote_token: RemoteToken,
+        remote_token: u32,
         flags: WriteFlags,
     ) -> Result<()> {
         unsafe {
@@ -177,7 +177,7 @@ impl QueuePair {
                 sge.as_ptr(),
                 sge.len() as u32,
                 remote_address,
-                remote_token.0,
+                remote_token,
                 flags.bits(),
             )
             .ok()
