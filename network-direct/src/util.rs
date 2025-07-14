@@ -78,6 +78,7 @@ pub fn get_local_addr(remote_addr: SocketAddr) -> SocketAddr {
             panic!("WSAStartup failed: {}", ret);
         }
     }
+    let remote_port = remote_addr.port();
     let (remote_addr, remote_addr_len) = std_addr_to_win(remote_addr);
     let mut local_addr = SOCKADDR_STORAGE::default();
     let local_addr_len = mem::size_of::<SOCKADDR_STORAGE>() as u32;
@@ -117,6 +118,7 @@ pub fn get_local_addr(remote_addr: SocketAddr) -> SocketAddr {
             WSAGetLastError().0
         });
     }
-
-    win_addr_to_std(unsafe { mem::transmute(&local_addr) }).unwrap()
+    let mut local_addr = win_addr_to_std(unsafe { mem::transmute(&local_addr) }).unwrap();
+    local_addr.set_port(remote_port);
+    local_addr
 }
