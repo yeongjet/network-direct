@@ -111,22 +111,6 @@ impl Connector {
             let (data_ptr, data_len) = private_data
                 .map(|s| (s.as_ptr(), s.len()))
                 .unwrap_or_else(|| (ptr::null(), 0));
-            // println!(
-            //     "nd accept: {:p},{:p},{:p}",
-            //     self,
-            //     queue_pair,
-            //     ov_ptr
-            // );
-            // println!(
-            //     "{:?},{:?},{},{},{:?},{},{:p}",
-            //     self.ptr,
-            //     queue_pair.ptr as *mut _,
-            //     limits.inbound_read_limit,
-            //     limits.outbound_read_limit,
-            //     data_ptr as *const _,
-            //     data_len as u32,
-            //     ov_ptr
-            // );
             let res = self.vtbl.Accept.unwrap()(
                 self.ptr,
                 queue_pair.ptr as *mut _,
@@ -154,7 +138,7 @@ impl Connector {
         }
     }
 
-    pub fn read_limits(&self) -> Result<ReadLimits> {
+    pub fn get_read_limits(&self) -> Result<ReadLimits> {
         unsafe {
             let mut limits = ReadLimits {
                 inbound_read_limit: 0,
@@ -170,7 +154,7 @@ impl Connector {
         }
     }
 
-    pub fn private_data(&self) -> Result<Vec<u8>> {
+    pub fn get_private_data(&self) -> Result<Vec<u8>> {
         unsafe {
             let mut size = 0;
             let res = self.vtbl.GetPrivateData.unwrap()(self.ptr, ptr::null_mut(), &mut size);
@@ -189,11 +173,11 @@ impl Connector {
         }
     }
 
-    pub fn local_address(&self) -> Result<SocketAddr> {
+    pub fn get_local_address(&self) -> Result<SocketAddr> {
         unsafe { win_addr_to_std_fn(self.ptr, self.vtbl.GetLocalAddress.unwrap()) }
     }
 
-    pub fn peer_address(&self) -> Result<SocketAddr> {
+    pub fn get_peer_address(&self) -> Result<SocketAddr> {
         unsafe { win_addr_to_std_fn(self.ptr, self.vtbl.GetPeerAddress.unwrap()) }
     }
 

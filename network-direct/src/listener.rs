@@ -60,7 +60,7 @@ impl Listener {
             );
 
             if res == ND_PENDING {
-                self.get_overlapped_result(overlapped, false)
+                self.get_overlapped_result(overlapped, true)
             } else {
                 res.ok()
             }
