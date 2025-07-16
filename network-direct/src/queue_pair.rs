@@ -47,6 +47,10 @@ pub struct QueuePair {
     vtbl: IND2QueuePairVtbl,
 }
 
+unsafe impl Send for QueuePair {}
+
+unsafe impl Sync for QueuePair {}
+
 impl AsRef<IND2QueuePair> for QueuePair {
     fn as_ref(&self) -> &IND2QueuePair {
         unsafe { &*self.ptr }
@@ -184,8 +188,6 @@ impl QueuePair {
         }
     }
 }
-
-unsafe impl Send for QueuePair {}
 
 impl Clone for QueuePair {
     fn clone(&self) -> Self {
