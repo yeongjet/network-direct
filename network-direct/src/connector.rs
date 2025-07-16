@@ -29,6 +29,10 @@ pub struct Connector {
     vtbl: IND2ConnectorVtbl,
 }
 
+unsafe impl Send for Connector {}
+
+unsafe impl Sync for Connector {}
+
 impl AsRef<IND2Connector> for Connector {
     fn as_ref(&self) -> &IND2Connector {
         unsafe { &*self.ptr }
