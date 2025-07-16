@@ -1,6 +1,3 @@
-use std::marker::PhantomData;
-use std::pin::Pin;
-
 use crate::ND2Overlapped;
 use bitflags::bitflags;
 use network_direct_sys::{
@@ -25,107 +22,20 @@ bitflags! {
     }
 }
 
-// pub struct UnregisteredMemoryRegion {
-//     ptr: *mut IND2MemoryRegion,
-//     vtbl: IND2MemoryRegionVtbl,
-// }
-
-// impl AsRef<IND2MemoryRegion> for UnregisteredMemoryRegion {
-//     fn as_ref(&self) -> &IND2MemoryRegion {
-//         unsafe { &*self.ptr }
-//     }
-// }
-
-// impl AsMut<IND2MemoryRegion> for UnregisteredMemoryRegion {
-//     fn as_mut(&mut self) -> &mut IND2MemoryRegion {
-//         unsafe { &mut *self.ptr }
-//     }
-// }
-
-// impl UnregisteredMemoryRegion {
-//     pub fn from(ptr: *mut IND2MemoryRegion) -> Self {
-//         Self {
-//             ptr,
-//             vtbl: unsafe { *((*ptr).lpVtbl) },
-//         }
-//     }
-
-//     pub fn get_local_token(&self) -> LocalToken {
-//         LocalToken(unsafe { self.vtbl.GetLocalToken.unwrap()(self.ptr) })
-//     }
-
-//     pub fn get_remote_token(&self) -> RemoteToken {
-//         RemoteToken(unsafe { self.vtbl.GetRemoteToken.unwrap()(self.ptr) })
-//     }
-
-// }
-
-// impl ND2Overlapped for UnregisteredMemoryRegion {
-//     fn as_overlapped_mut(&self) -> &mut IND2Overlapped {
-//         unsafe { &mut *(self.ptr as *mut IND2Overlapped) }
-//     }
-// }
-
-// impl Drop for UnregisteredMemoryRegion {
-//     fn drop(&mut self) {
-//         unsafe {
-//             let _n = self.vtbl.Release.unwrap()(self.ptr);
-//         }
-//     }
-// }
-
-// pub type Buffer = Pin<Box<[u8; 4096]>>;
-// pub type Buffer<T, N> = Pin<Box<GenericArray<T, N>>>;
-
-// pub struct MemoryRegion<T, U>
-// where
-//     T: AsRef<[U]>,
-// {
-//     ptr: *mut IND2MemoryRegion,
-//     vtbl: IND2MemoryRegionVtbl,
-//     pub buffer: T,
-// }
-
 pub trait Buffer {
     fn as_ptr(&self) -> *const u8;
     fn byte_len(&self) -> usize;
 }
-
-// impl<T> Buffer for T {
-//     fn as_ptr(&self) -> *const u8 {
-//         self as *const T as *const u8
-//     }
-//     fn byte_len(&self) -> usize {
-//         std::mem::size_of::<T>()
-//     }
-// }
-
-// impl<T> Buffer for [T] {
-//     fn as_ptr(&self) -> *const u8 {
-//         self.as_ptr() as *const u8
-//     }
-//     fn byte_len(&self) -> usize {
-//         self.len() * std::mem::size_of::<T>()
-//     }
-// }
-
-// impl<T> Buffer for Vec<T> {
-//     fn as_ptr(&self) -> *const u8 {
-//         self.as_slice().as_ptr() as *const u8
-//     }
-//     fn byte_len(&self) -> usize {
-//         self.len() * std::mem::size_of::<T>()
-//     }
-// }
 
 pub struct MemoryRegion<T: Buffer> {
     ptr: *mut IND2MemoryRegion,
     vtbl: IND2MemoryRegionVtbl,
     pub buffer: T,
 }
-// unsafe impl<T> Send for MemoryRegion<T> where T: Send {}
 
-// unsafe impl<T> Sync for MemoryRegion<T> {}
+unsafe impl<T: Buffer> Send for MemoryRegion<T> where T: Send {}
+
+unsafe impl<T: Buffer> Sync for MemoryRegion<T> {}
 
 impl<T: Buffer> MemoryRegion<T> {
     fn as_ref(&self) -> &IND2MemoryRegion {
