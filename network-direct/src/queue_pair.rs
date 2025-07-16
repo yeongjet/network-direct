@@ -36,6 +36,7 @@ bitflags! {
     }
 
     pub struct WriteFlags: u32 {
+        const None = 0;
         const SILENT_SUCCESS = ND_OP_FLAG_SILENT_SUCCESS;
         const READ_FENCE = ND_OP_FLAG_READ_FENCE;
         const INLINE = ND_OP_FLAG_INLINE;
