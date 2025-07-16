@@ -28,6 +28,10 @@ pub struct CompletionQueue {
     vtbl: IND2CompletionQueueVtbl,
 }
 
+unsafe impl Send for CompletionQueue {}
+
+unsafe impl Sync for CompletionQueue {}
+
 impl AsRef<IND2CompletionQueue> for CompletionQueue {
     fn as_ref(&self) -> &IND2CompletionQueue {
         unsafe { &*self.ptr }
