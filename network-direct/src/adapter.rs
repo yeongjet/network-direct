@@ -1,8 +1,5 @@
 use network_direct_sys::{
-    IID_IND2CompletionQueue, IID_IND2Connector, IID_IND2Listener, IID_IND2MemoryRegion,
-    IID_IND2MemoryWindow, IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue,
-    IND2Connector, IND2Listener, IND2MemoryRegion, IND2MemoryWindow, IND2QueuePair, KAFFINITY,
-    ND_VERSION_2, ND2_ADAPTER_INFO,
+    IID_IND2CompletionQueue, IID_IND2Connector, IID_IND2Listener, IID_IND2MemoryRegion, IID_IND2MemoryWindow, IID_IND2QueuePair, IND2Adapter, IND2AdapterVtbl, IND2CompletionQueue, IND2Connector, IND2Listener, IND2MemoryRegion, IND2MemoryWindow, IND2QueuePair, KAFFINITY, ND2_ADAPTER_INFO, ND_VERSION_2, _ND2_ADAPTER_INFO
 };
 use std::{
     fs::File,
@@ -13,6 +10,8 @@ use std::{
 use windows::{Win32::Foundation::HANDLE, core::Result};
 
 use crate::{Buffer, CompletionQueue, Connector, Listener, MemoryRegion, MemoryWindow, QueuePair};
+
+pub type AdapterInfo = _ND2_ADAPTER_INFO;
 
 pub struct Adapter {
     ptr: *mut IND2Adapter,

@@ -13,6 +13,8 @@ use windows::{
 };
 use windows_core::PCSTR;
 
+pub type Overlap = OVERLAPPED;
+
 pub struct Overlapped {
     pub ptr: OVERLAPPED,
 }
